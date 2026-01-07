@@ -29,31 +29,27 @@
         const { useState, useEffect } = React;
         const AdminApp = () => {
             const [matches, setMatches] = useState([]);
-            const [cupMatches, setCupMatches] = useState([]);
             const [players, setPlayers] = useState([]);
             const [scorers, setScorers] = useState({});
+            const [assists, setAssists] = useState({});
             const [loading, setLoading] = useState(true);
-            const [matchType, setMatchType] = useState('championship');
             const [selectedMatch, setSelectedMatch] = useState(null);
             const [selectedDate, setSelectedDate] = useState('');
             const [scoreRouges, setScoreRouges] = useState('');
             const [scoreBlancs, setScoreBlancs] = useState('');
             const [selectedTeam, setSelectedTeam] = useState('rouges');
-            const [selectedPlayer, setSelectedPlayer] = useState('');
+            const [selectedScorer, setSelectedScorer] = useState('');
+            const [selectedAssist, setSelectedAssist] = useState('');
             const [newPlayerName, setNewPlayerName] = useState('');
-            const [buteursRouges, setButeursRouges] = useState([]);
-            const [buteursBlancs, setButeursBlancs] = useState([]);
+            const [goalsRouges, setGoalsRouges] = useState([]);
+            const [goalsBlancs, setGoalsBlancs] = useState([]);
             const [saving, setSaving] = useState(false);
 
-            const championshipDates = ['2026-01-19', '2026-01-26', '2026-02-02', '2026-02-09', '2026-02-23', '2026-03-02', '2026-03-09', '2026-03-16', '2026-03-23', '2026-03-30', '2026-04-13', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11', '2026-05-18', '2026-06-01', '2026-06-08', '2026-06-15'];
-            const cupDates = ['2026-06-22', '2026-06-29'];
+            const championshipDates = ['2026-01-19', '2026-01-26', '2026-02-02', '2026-02-09', '2026-02-23', '2026-03-02', '2026-03-09', '2026-03-16', '2026-03-23', '2026-03-30', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11', '2026-05-18', '2026-06-01'];
 
             useEffect(() => {
                 const unsubMatches = db.collection('championship').doc('matches').onSnapshot((doc) => {
                     if (doc.exists) setMatches(doc.data().data || []); else initializeData();
-                });
-                const unsubCup = db.collection('championship').doc('cup').onSnapshot((doc) => {
-                    if (doc.exists) setCupMatches(doc.data().data || []);
                 });
                 const unsubPlayers = db.collection('championship').doc('players').onSnapshot((doc) => {
                     if (doc.exists) setPlayers(doc.data().data || []);
@@ -61,25 +57,27 @@
                 const unsubScorers = db.collection('championship').doc('scorers').onSnapshot((doc) => {
                     if (doc.exists) setScorers(doc.data().data || {});
                 });
+                const unsubAssists = db.collection('championship').doc('assists').onSnapshot((doc) => {
+                    if (doc.exists) setAssists(doc.data().data || {});
+                });
                 setLoading(false);
-                return () => { unsubMatches(); unsubCup(); unsubPlayers(); unsubScorers(); };
+                return () => { unsubMatches(); unsubPlayers(); unsubScorers(); unsubAssists(); };
             }, []);
 
             const initializeData = async () => {
-                const initialMatches = championshipDates.map((dateStr, idx) => ({ journee: idx + 1, date: dateStr, scoreRouges: null, scoreBlancs: null, buteursRouges: [], buteursBlancs: [] }));
-                const initialCup = cupDates.map((dateStr, idx) => ({ match: idx === 0 ? 'Aller' : 'Retour', date: dateStr, scoreRouges: null, scoreBlancs: null, buteursRouges: [], buteursBlancs: [] }));
+                const initialMatches = championshipDates.map((dateStr, idx) => ({ journee: idx + 1, date: dateStr, scoreRouges: null, scoreBlancs: null, goalsRouges: [], goalsBlancs: [] }));
                 await db.collection('championship').doc('matches').set({ data: initialMatches });
-                await db.collection('championship').doc('cup').set({ data: initialCup });
                 await db.collection('championship').doc('players').set({ data: [] });
                 await db.collection('championship').doc('scorers').set({ data: {} });
+                await db.collection('championship').doc('assists').set({ data: {} });
             };
 
-            const saveData = async (newMatches, newCup, newPlayers, newScorers) => {
+            const saveData = async (newMatches, newPlayers, newScorers, newAssists) => {
                 try {
                     await db.collection('championship').doc('matches').set({ data: newMatches });
-                    await db.collection('championship').doc('cup').set({ data: newCup });
                     await db.collection('championship').doc('players').set({ data: newPlayers });
                     await db.collection('championship').doc('scorers').set({ data: newScorers });
+                    await db.collection('championship').doc('assists').set({ data: newAssists });
                 } catch (error) { alert('Erreur de sauvegarde'); }
             };
 
@@ -87,54 +85,57 @@
                 if (newPlayerName.trim() && !players.includes(newPlayerName.trim())) {
                     const updatedPlayers = [...players, newPlayerName.trim()].sort();
                     setPlayers(updatedPlayers);
-                    await saveData(matches, cupMatches, updatedPlayers, scorers);
+                    await saveData(matches, updatedPlayers, scorers, assists);
                     setNewPlayerName(''); alert('Joueur ajouté !');
                 }
             };
 
-            const addScorer = () => {
-                if (!selectedPlayer) return;
-                if (selectedTeam === 'rouges') setButeursRouges([...buteursRouges, selectedPlayer]);
-                else setButeursBlancs([...buteursBlancs, selectedPlayer]);
-                setSelectedPlayer('');
+            const addGoal = () => {
+                if (!selectedScorer) { alert('Sélectionnez un buteur'); return; }
+                const goal = { scorer: selectedScorer, assist: selectedAssist || 'Aucune' };
+                if (selectedTeam === 'rouges') setGoalsRouges([...goalsRouges, goal]);
+                else setGoalsBlancs([...goalsBlancs, goal]);
+                setSelectedScorer(''); setSelectedAssist('');
             };
 
-            const removeScorer = (team, index) => {
-                if (team === 'rouges') setButeursRouges(buteursRouges.filter((_, i) => i !== index));
-                else setButeursBlancs(buteursBlancs.filter((_, i) => i !== index));
+            const removeGoal = (team, index) => {
+                if (team === 'rouges') setGoalsRouges(goalsRouges.filter((_, i) => i !== index));
+                else setGoalsBlancs(goalsBlancs.filter((_, i) => i !== index));
             };
 
             const handleSaveMatch = async () => {
                 if (!selectedMatch || scoreRouges === '' || scoreBlancs === '') { alert('Remplir tous les champs'); return; }
+                if (parseInt(scoreRouges) !== goalsRouges.length || parseInt(scoreBlancs) !== goalsBlancs.length) {
+                    alert(`Le nombre de buts enregistrés ne correspond pas au score !\nRouges: ${goalsRouges.length}/${scoreRouges} - Blancs: ${goalsBlancs.length}/${scoreBlancs}`);
+                    return;
+                }
                 setSaving(true);
-                const isCup = matchType === 'cup';
-                const currentMatches = isCup ? cupMatches : matches;
-                const setCurrentMatches = isCup ? setCupMatches : setMatches;
-                const updatedMatches = [...currentMatches];
-                const matchIndex = isCup ? currentMatches.findIndex(m => m.match === selectedMatch.match) : currentMatches.findIndex(m => m.journee === selectedMatch.journee);
-                updatedMatches[matchIndex] = { ...selectedMatch, date: selectedDate, scoreRouges: parseInt(scoreRouges), scoreBlancs: parseInt(scoreBlancs), buteursRouges: [...buteursRouges], buteursBlancs: [...buteursBlancs] };
-                if (!isCup) {
-                    const updatedScorers = { ...scorers };
-                    [...buteursRouges, ...buteursBlancs].forEach(buteur => { updatedScorers[buteur] = (updatedScorers[buteur] || 0) + 1; });
-                    setScorers(updatedScorers);
-                    await saveData(updatedMatches, cupMatches, players, updatedScorers);
-                } else await saveData(matches, updatedMatches, players, scorers);
-                setCurrentMatches(updatedMatches); resetForm(); setSaving(false); alert('Match enregistré !');
+                const updatedMatches = [...matches];
+                const matchIndex = matches.findIndex(m => m.journee === selectedMatch.journee);
+                updatedMatches[matchIndex] = { ...selectedMatch, date: selectedDate, scoreRouges: parseInt(scoreRouges), scoreBlancs: parseInt(scoreBlancs), goalsRouges: [...goalsRouges], goalsBlancs: [...goalsBlancs] };
+
+                const updatedScorers = { ...scorers };
+                const updatedAssists = { ...assists };
+                [...goalsRouges, ...goalsBlancs].forEach(goal => {
+                    updatedScorers[goal.scorer] = (updatedScorers[goal.scorer] || 0) + 1;
+                    if (goal.assist !== 'Aucune') updatedAssists[goal.assist] = (updatedAssists[goal.assist] || 0) + 1;
+                });
+                setScorers(updatedScorers); setAssists(updatedAssists);
+                await saveData(updatedMatches, players, updatedScorers, updatedAssists);
+                setMatches(updatedMatches); resetForm(); setSaving(false); alert('Match enregistré !');
             };
 
-            const resetForm = () => { setSelectedMatch(null); setSelectedDate(''); setScoreRouges(''); setScoreBlancs(''); setButeursRouges([]); setButeursBlancs([]); setSelectedPlayer(''); };
+            const resetForm = () => { setSelectedMatch(null); setSelectedDate(''); setScoreRouges(''); setScoreBlancs(''); setGoalsRouges([]); setGoalsBlancs([]); setSelectedScorer(''); setSelectedAssist(''); };
 
             const handleMatchSelect = (e) => {
                 const value = e.target.value;
                 if (!value) { resetForm(); return; }
-                const isCup = matchType === 'cup';
-                const currentMatches = isCup ? cupMatches : matches;
-                const match = isCup ? currentMatches.find(m => m.match === value) : currentMatches.find(m => m.journee === parseInt(value));
+                const match = matches.find(m => m.journee === parseInt(value));
                 setSelectedMatch(match); setSelectedDate(match ? match.date : '');
                 if (match) {
                     setScoreRouges(match.scoreRouges !== null ? match.scoreRouges : '');
                     setScoreBlancs(match.scoreBlancs !== null ? match.scoreBlancs : '');
-                    setButeursRouges(match.buteursRouges || []); setButeursBlancs(match.buteursBlancs || []);
+                    setGoalsRouges(match.goalsRouges || []); setGoalsBlancs(match.goalsBlancs || []);
                 }
             };
 
@@ -142,14 +143,12 @@
 
             const handleResetData = async () => {
                 if (window.confirm('⚠️ Réinitialiser TOUT ?')) {
-                    const initialMatches = championshipDates.map((dateStr, idx) => ({ journee: idx + 1, date: dateStr, scoreRouges: null, scoreBlancs: null, buteursRouges: [], buteursBlancs: [] }));
-                    const initialCup = cupDates.map((dateStr, idx) => ({ match: idx === 0 ? 'Aller' : 'Retour', date: dateStr, scoreRouges: null, scoreBlancs: null, buteursRouges: [], buteursBlancs: [] }));
-                    setMatches(initialMatches); setCupMatches(initialCup); setPlayers([]); setScorers({});
-                    await saveData(initialMatches, initialCup, [], {}); resetForm(); alert('Réinitialisé !');
+                    const initialMatches = championshipDates.map((dateStr, idx) => ({ journee: idx + 1, date: dateStr, scoreRouges: null, scoreBlancs: null, goalsRouges: [], goalsBlancs: [] }));
+                    setMatches(initialMatches); setPlayers([]); setScorers({}); setAssists({});
+                    await saveData(initialMatches, [], {}, {}); resetForm(); alert('Réinitialisé !');
                 }
             };
 
-            const currentMatches = matchType === 'championship' ? matches : cupMatches;
             if (loading) return <div className="flex items-center justify-center h-screen bg-red-900 text-white text-xl">⚙️ Chargement...</div>;
 
             return (
@@ -158,52 +157,94 @@
                         <div className="bg-white rounded-lg shadow-xl p-3 mb-3">
                             <div className="flex items-center gap-2">
                                 <div className="w-8 h-8 bg-red-600 rounded-full"></div>
-                                <div><h1 className="text-xl font-bold">🔒 MODE ADMIN</h1><p className="text-xs text-gray-600">Gestion</p></div>
+                                <div><h1 className="text-xl font-bold">🔒 MODE ADMIN</h1><p className="text-xs text-gray-600">Gestion du Championnat</p></div>
                             </div>
                         </div>
                         <div className="bg-white rounded-lg shadow-lg p-3 mb-3">
-                            <h2 className="text-lg font-bold mb-2">Joueurs</h2>
+                            <h2 className="text-lg font-bold mb-2">👥 Joueurs</h2>
                             <div className="flex gap-2 mb-2">
-                                <input type="text" className="flex-1 p-2 border rounded text-sm" placeholder="Nom" value={newPlayerName} onChange={(e) => setNewPlayerName(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addPlayer()} />
+                                <input type="text" className="flex-1 p-2 border rounded text-sm" placeholder="Nom du joueur" value={newPlayerName} onChange={(e) => setNewPlayerName(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addPlayer()} />
                                 <button onClick={addPlayer} className="bg-green-600 text-white px-3 py-2 rounded font-bold text-sm">➕</button>
                             </div>
                             <div className="bg-gray-50 p-2 rounded max-h-24 overflow-y-auto"><p className="font-semibold text-xs mb-1">Joueurs ({players.length}):</p><div className="flex flex-wrap gap-1">{players.map(p => <span key={p} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">{p}</span>)}</div></div>
                         </div>
                         <div className="bg-white rounded-lg shadow-lg p-3 mb-3">
-                            <h2 className="text-lg font-bold mb-2">Matchs</h2>
-                            <div className="flex gap-2 mb-2">
-                                <button onClick={() => { setMatchType('championship'); resetForm(); }} className={`flex-1 py-2 rounded font-bold text-sm ${matchType === 'championship' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}>Championnat</button>
-                                <button onClick={() => { setMatchType('cup'); resetForm(); }} className={`flex-1 py-2 rounded font-bold text-sm ${matchType === 'cup' ? 'bg-yellow-500 text-white' : 'bg-gray-200'}`}>Coupe</button>
-                            </div>
-                            <select className="w-full p-2 border rounded text-sm mb-2" onChange={handleMatchSelect} value={selectedMatch ? (matchType === 'cup' ? selectedMatch.match : selectedMatch.journee) : ''}>
-                                <option value="">-- Match --</option>
-                                {currentMatches.map(match => (
-                                    <option key={matchType === 'cup' ? match.match : match.journee} value={matchType === 'cup' ? match.match : match.journee}>
-                                        {matchType === 'cup' ? `${match.match} - ${new Date(match.date + 'T12:00:00').toLocaleDateString('fr-FR')}` : `J${match.journee} - ${new Date(match.date + 'T12:00:00').toLocaleDateString('fr-FR')}`}
+                            <h2 className="text-lg font-bold mb-2">⚽ Matchs</h2>
+                            <select className="w-full p-2 border rounded text-sm mb-2" onChange={handleMatchSelect} value={selectedMatch?.journee || ''}>
+                                <option value="">-- Sélectionner un match --</option>
+                                {matches.map(match => (
+                                    <option key={match.journee} value={match.journee}>
+                                        J{match.journee} - {new Date(match.date + 'T12:00:00').toLocaleDateString('fr-FR')}
                                         {match.scoreRouges !== null ? ` (${match.scoreRouges}-${match.scoreBlancs})` : ''}
+                                        {match.journee === 16 ? ' 🍽️ FINALE + REPAS' : ''}
                                     </option>
                                 ))}
                             </select>
                             {selectedMatch && (
                                 <div className="space-y-2">
+                                    {selectedMatch.journee === 16 && (
+                                        <div className="bg-yellow-100 border-2 border-yellow-500 rounded-lg p-2 text-center">
+                                            <p className="text-sm font-bold text-yellow-800">🍽️ MATCH FINAL - L'équipe perdante offre le repas !</p>
+                                        </div>
+                                    )}
                                     <input type="date" className="w-full p-2 border rounded text-sm" value={selectedDate} onChange={handleDateChange} />
                                     <div className="grid grid-cols-2 gap-2">
-                                        <div><label className="block font-semibold text-xs mb-1 text-red-600">Rouges:</label><input type="number" min="0" className="w-full p-2 border rounded text-sm" value={scoreRouges} onChange={(e) => setScoreRouges(e.target.value)} /></div>
-                                        <div><label className="block font-semibold text-xs mb-1 text-blue-600">Blancs:</label><input type="number" min="0" className="w-full p-2 border rounded text-sm" value={scoreBlancs} onChange={(e) => setScoreBlancs(e.target.value)} /></div>
+                                        <div><label className="block font-semibold text-xs mb-1 text-red-600">Score Rouges:</label><input type="number" min="0" className="w-full p-2 border rounded text-sm" value={scoreRouges} onChange={(e) => setScoreRouges(e.target.value)} /></div>
+                                        <div><label className="block font-semibold text-xs mb-1 text-blue-600">Score Blancs:</label><input type="number" min="0" className="w-full p-2 border rounded text-sm" value={scoreBlancs} onChange={(e) => setScoreBlancs(e.target.value)} /></div>
                                     </div>
-                                    <div className="border-t pt-2"><h3 className="font-bold text-sm mb-1">Buteurs</h3><div className="grid grid-cols-2 gap-2 mb-1">
-                                        <select className="w-full p-2 border rounded text-sm" value={selectedTeam} onChange={(e) => setSelectedTeam(e.target.value)}><option value="rouges">Rouges</option><option value="blancs">Blancs</option></select>
-                                        <select className="w-full p-2 border rounded text-sm" value={selectedPlayer} onChange={(e) => setSelectedPlayer(e.target.value)}><option value="">-- Joueur --</option>{players.map(p => <option key={p} value={p}>{p}</option>)}</select>
-                                    </div><button onClick={addScorer} disabled={!selectedPlayer} className="w-full bg-blue-600 text-white py-2 rounded font-bold text-sm disabled:bg-gray-300">Ajouter buteur</button></div>
+                                    <div className="border-t pt-2">
+                                        <h3 className="font-bold text-sm mb-1">Ajouter un but</h3>
+                                        <div className="space-y-2">
+                                            <select className="w-full p-2 border rounded text-sm" value={selectedTeam} onChange={(e) => setSelectedTeam(e.target.value)}>
+                                                <option value="rouges">Équipe Rouges</option>
+                                                <option value="blancs">Équipe Blancs</option>
+                                            </select>
+                                            <select className="w-full p-2 border rounded text-sm" value={selectedScorer} onChange={(e) => setSelectedScorer(e.target.value)}>
+                                                <option value="">-- Buteur --</option>
+                                                {players.map(p => <option key={p} value={p}>{p}</option>)}
+                                            </select>
+                                            <select className="w-full p-2 border rounded text-sm" value={selectedAssist} onChange={(e) => setSelectedAssist(e.target.value)}>
+                                                <option value="">-- Passeur (optionnel) --</option>
+                                                {players.map(p => <option key={p} value={p}>{p}</option>)}
+                                            </select>
+                                            <button onClick={addGoal} disabled={!selectedScorer} className="w-full bg-blue-600 text-white py-2 rounded font-bold text-sm disabled:bg-gray-300">➕ Ajouter ce but</button>
+                                        </div>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-2">
-                                        <div className="bg-red-50 p-2 rounded"><h4 className="font-bold text-red-700 text-xs mb-1">Rouges ({buteursRouges.length})</h4>{buteursRouges.map((b, i) => <div key={i} className="flex justify-between bg-white p-1 rounded mb-1 text-xs"><span>⚽ {b}</span><button onClick={() => removeScorer('rouges', i)} className="text-red-600">❌</button></div>)}</div>
-                                        <div className="bg-blue-50 p-2 rounded"><h4 className="font-bold text-blue-700 text-xs mb-1">Blancs ({buteursBlancs.length})</h4>{buteursBlancs.map((b, i) => <div key={i} className="flex justify-between bg-white p-1 rounded mb-1 text-xs"><span>⚽ {b}</span><button onClick={() => removeScorer('blancs', i)} className="text-blue-600">❌</button></div>)}</div>
+                                        <div className="bg-red-50 p-2 rounded">
+                                            <h4 className="font-bold text-red-700 text-xs mb-1">Buts Rouges ({goalsRouges.length})</h4>
+                                            <div className="space-y-1">
+                                                {goalsRouges.map((goal, i) => (
+                                                    <div key={i} className="bg-white p-1 rounded text-xs flex justify-between items-start">
+                                                        <div>
+                                                            <div>⚽ <strong>{goal.scorer}</strong></div>
+                                                            {goal.assist !== 'Aucune' && <div className="text-gray-600">🎯 {goal.assist}</div>}
+                                                        </div>
+                                                        <button onClick={() => removeGoal('rouges', i)} className="text-red-600">❌</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="bg-blue-50 p-2 rounded">
+                                            <h4 className="font-bold text-blue-700 text-xs mb-1">Buts Blancs ({goalsBlancs.length})</h4>
+                                            <div className="space-y-1">
+                                                {goalsBlancs.map((goal, i) => (
+                                                    <div key={i} className="bg-white p-1 rounded text-xs flex justify-between items-start">
+                                                        <div>
+                                                            <div>⚽ <strong>{goal.scorer}</strong></div>
+                                                            {goal.assist !== 'Aucune' && <div className="text-gray-600">🎯 {goal.assist}</div>}
+                                                        </div>
+                                                        <button onClick={() => removeGoal('blancs', i)} className="text-blue-600">❌</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <button onClick={handleSaveMatch} disabled={saving} className="w-full bg-green-600 text-white py-2 rounded font-bold text-sm">{saving ? '💾 En cours...' : '✅ Enregistrer'}</button>
+                                    <button onClick={handleSaveMatch} disabled={saving} className="w-full bg-green-600 text-white py-3 rounded font-bold text-sm">{saving ? '💾 Enregistrement...' : '✅ Enregistrer le Match'}</button>
                                 </div>
                             )}
                         </div>
-                        <div className="bg-white rounded-lg shadow-lg p-3"><h3 className="font-bold text-red-600 mb-2 text-sm">⚠️ Danger</h3><button onClick={handleResetData} className="bg-red-600 text-white px-3 py-2 rounded font-bold text-sm">🗑️ Réinitialiser</button></div>
+                        <div className="bg-white rounded-lg shadow-lg p-3"><h3 className="font-bold text-red-600 mb-2 text-sm">⚠️ Zone Danger</h3><button onClick={handleResetData} className="bg-red-600 text-white px-3 py-2 rounded font-bold text-sm">🗑️ Réinitialiser tout</button></div>
                     </div>
                 </div>
             );
@@ -211,4 +252,4 @@
         ReactDOM.render(<AdminApp />, document.getElementById('root'));
     </script>
 </body>
-</html>
+    </html>
