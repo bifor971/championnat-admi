@@ -1,1 +1,223 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔒 ADMIN - Championnat 2026</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyD26jNyvIzWYNwfS97N27iZES-AFWVtIGc",
+            authDomain: "championnat-football.firebaseapp.com",
+            projectId: "championnat-football",
+            storageBucket: "championnat-football.firebasestorage.app",
+            messagingSenderId: "271329092716",
+            appId: "1:271329092716:web:68e7ff9e0527f489c36449"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+    </script>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const AdminApp = () => {
+            const [matches, setMatches] = useState([]);
+            const [cupMatches, setCupMatches] = useState([]);
+            const [players, setPlayers] = useState([]);
+            const [scorers, setScorers] = useState({});
+            const [loading, setLoading] = useState(true);
+            const [matchType, setMatchType] = useState('championship');
+            const [selectedMatch, setSelectedMatch] = useState(null);
+            const [selectedDate, setSelectedDate] = useState('');
+            const [scoreRouges, setScoreRouges] = useState('');
+            const [scoreBlancs, setScoreBlancs] = useState('');
+            const [selectedTeam, setSelectedTeam] = useState('rouges');
+            const [selectedPlayer, setSelectedPlayer] = useState('');
+            const [newPlayerName, setNewPlayerName] = useState('');
+            const [buteursRouges, setButeursRouges] = useState([]);
+            const [buteursBlancs, setButeursBlancs] = useState([]);
+            const [saving, setSaving] = useState(false);
 
+            const championshipDates = ['2026-01-19', '2026-01-26', '2026-02-02', '2026-02-09', '2026-02-23', '2026-03-02', '2026-03-09', '2026-03-16', '2026-03-23', '2026-03-30', '2026-04-13', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11', '2026-05-18', '2026-06-01', '2026-06-08', '2026-06-15'];
+            const cupDates = ['2026-06-22', '2026-06-29'];
+
+            useEffect(() => {
+                const unsubMatches = db.collection('championship').doc('matches').onSnapshot((doc) => {
+                    if (doc.exists) setMatches(doc.data().data || []); else initializeData();
+                });
+                const unsubCup = db.collection('championship').doc('cup').onSnapshot((doc) => {
+                    if (doc.exists) setCupMatches(doc.data().data || []);
+                });
+                const unsubPlayers = db.collection('championship').doc('players').onSnapshot((doc) => {
+                    if (doc.exists) setPlayers(doc.data().data || []);
+                });
+                const unsubScorers = db.collection('championship').doc('scorers').onSnapshot((doc) => {
+                    if (doc.exists) setScorers(doc.data().data || {});
+                });
+                setLoading(false);
+                return () => { unsubMatches(); unsubCup(); unsubPlayers(); unsubScorers(); };
+            }, []);
+
+            const initializeData = async () => {
+                const initialMatches = championshipDates.map((dateStr, idx) => ({ journee: idx + 1, date: dateStr, scoreRouges: null, scoreBlancs: null, buteursRouges: [], buteursBlancs: [] }));
+                const initialCup = cupDates.map((dateStr, idx) => ({ match: idx === 0 ? 'Aller' : 'Retour', date: dateStr, scoreRouges: null, scoreBlancs: null, buteursRouges: [], buteursBlancs: [] }));
+                await db.collection('championship').doc('matches').set({ data: initialMatches });
+                await db.collection('championship').doc('cup').set({ data: initialCup });
+                await db.collection('championship').doc('players').set({ data: [] });
+                await db.collection('championship').doc('scorers').set({ data: {} });
+            };
+
+            const saveData = async (newMatches, newCup, newPlayers, newScorers) => {
+                try {
+                    await db.collection('championship').doc('matches').set({ data: newMatches });
+                    await db.collection('championship').doc('cup').set({ data: newCup });
+                    await db.collection('championship').doc('players').set({ data: newPlayers });
+                    await db.collection('championship').doc('scorers').set({ data: newScorers });
+                } catch (error) { alert('Erreur de sauvegarde'); }
+            };
+
+            const addPlayer = async () => {
+                if (newPlayerName.trim() && !players.includes(newPlayerName.trim())) {
+                    const updatedPlayers = [...players, newPlayerName.trim()].sort();
+                    setPlayers(updatedPlayers);
+                    await saveData(matches, cupMatches, updatedPlayers, scorers);
+                    setNewPlayerName(''); alert('Joueur ajouté !');
+                }
+            };
+
+            const addScorer = () => {
+                if (!selectedPlayer) return;
+                if (selectedTeam === 'rouges') setButeursRouges([...buteursRouges, selectedPlayer]);
+                else setButeursBlancs([...buteursBlancs, selectedPlayer]);
+                setSelectedPlayer('');
+            };
+
+            const removeScorer = (team, index) => {
+                if (team === 'rouges') setButeursRouges(buteursRouges.filter((_, i) => i !== index));
+                else setButeursBlancs(buteursBlancs.filter((_, i) => i !== index));
+            };
+
+            const handleSaveMatch = async () => {
+                if (!selectedMatch || scoreRouges === '' || scoreBlancs === '') { alert('Remplir tous les champs'); return; }
+                setSaving(true);
+                const isCup = matchType === 'cup';
+                const currentMatches = isCup ? cupMatches : matches;
+                const setCurrentMatches = isCup ? setCupMatches : setMatches;
+                const updatedMatches = [...currentMatches];
+                const matchIndex = isCup ? currentMatches.findIndex(m => m.match === selectedMatch.match) : currentMatches.findIndex(m => m.journee === selectedMatch.journee);
+                updatedMatches[matchIndex] = { ...selectedMatch, date: selectedDate, scoreRouges: parseInt(scoreRouges), scoreBlancs: parseInt(scoreBlancs), buteursRouges: [...buteursRouges], buteursBlancs: [...buteursBlancs] };
+                if (!isCup) {
+                    const updatedScorers = { ...scorers };
+                    [...buteursRouges, ...buteursBlancs].forEach(buteur => { updatedScorers[buteur] = (updatedScorers[buteur] || 0) + 1; });
+                    setScorers(updatedScorers);
+                    await saveData(updatedMatches, cupMatches, players, updatedScorers);
+                } else await saveData(matches, updatedMatches, players, scorers);
+                setCurrentMatches(updatedMatches); resetForm(); setSaving(false); alert('Match enregistré !');
+            };
+
+            const resetForm = () => { setSelectedMatch(null); setSelectedDate(''); setScoreRouges(''); setScoreBlancs(''); setButeursRouges([]); setButeursBlancs([]); setSelectedPlayer(''); };
+
+            const handleMatchSelect = (e) => {
+                const value = e.target.value;
+                if (!value) { resetForm(); return; }
+                const isCup = matchType === 'cup';
+                const currentMatches = isCup ? cupMatches : matches;
+                const match = isCup ? currentMatches.find(m => m.match === value) : currentMatches.find(m => m.journee === parseInt(value));
+                setSelectedMatch(match); setSelectedDate(match ? match.date : '');
+                if (match) {
+                    setScoreRouges(match.scoreRouges !== null ? match.scoreRouges : '');
+                    setScoreBlancs(match.scoreBlancs !== null ? match.scoreBlancs : '');
+                    setButeursRouges(match.buteursRouges || []); setButeursBlancs(match.buteursBlancs || []);
+                }
+            };
+
+            const handleDateChange = (e) => { const newDate = e.target.value; setSelectedDate(newDate); if (selectedMatch) setSelectedMatch({ ...selectedMatch, date: newDate }); };
+
+            const handleResetData = async () => {
+                if (window.confirm('⚠️ Réinitialiser TOUT ?')) {
+                    const initialMatches = championshipDates.map((dateStr, idx) => ({ journee: idx + 1, date: dateStr, scoreRouges: null, scoreBlancs: null, buteursRouges: [], buteursBlancs: [] }));
+                    const initialCup = cupDates.map((dateStr, idx) => ({ match: idx === 0 ? 'Aller' : 'Retour', date: dateStr, scoreRouges: null, scoreBlancs: null, buteursRouges: [], buteursBlancs: [] }));
+                    setMatches(initialMatches); setCupMatches(initialCup); setPlayers([]); setScorers({});
+                    await saveData(initialMatches, initialCup, [], {}); resetForm(); alert('Réinitialisé !');
+                }
+            };
+
+            const currentMatches = matchType === 'championship' ? matches : cupMatches;
+            if (loading) return <div className="flex items-center justify-center h-screen bg-red-900 text-white text-xl">⚙️ Chargement...</div>;
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-red-900 via-red-800 to-red-900 p-3">
+                    <div className="max-w-4xl mx-auto">
+                        <div className="bg-white rounded-lg shadow-xl p-3 mb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-red-600 rounded-full"></div>
+                                <div><h1 className="text-xl font-bold">🔒 MODE ADMIN</h1><p className="text-xs text-gray-600">Gestion</p></div>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-lg shadow-lg p-3 mb-3">
+                            <h2 className="text-lg font-bold mb-2">Joueurs</h2>
+                            <div className="flex gap-2 mb-2">
+                                <input type="text" className="flex-1 p-2 border rounded text-sm" placeholder="Nom" value={newPlayerName} onChange={(e) => setNewPlayerName(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addPlayer()} />
+                                <button onClick={addPlayer} className="bg-green-600 text-white px-3 py-2 rounded font-bold text-sm">➕</button>
+                            </div>
+                            <div className="bg-gray-50 p-2 rounded max-h-24 overflow-y-auto"><p className="font-semibold text-xs mb-1">Joueurs ({players.length}):</p><div className="flex flex-wrap gap-1">{players.map(p => <span key={p} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">{p}</span>)}</div></div>
+                        </div>
+                        <div className="bg-white rounded-lg shadow-lg p-3 mb-3">
+                            <h2 className="text-lg font-bold mb-2">Matchs</h2>
+                            <div className="flex gap-2 mb-2">
+                                <button onClick={() => { setMatchType('championship'); resetForm(); }} className={`flex-1 py-2 rounded font-bold text-sm ${matchType === 'championship' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}>Championnat</button>
+                                <button onClick={() => { setMatchType('cup'); resetForm(); }} className={`flex-1 py-2 rounded font-bold text-sm ${matchType === 'cup' ? 'bg-yellow-500 text-white' : 'bg-gray-200'}`}>Coupe</button>
+                            </div>
+                            <select className="w-full p-2 border rounded text-sm mb-2" onChange={handleMatchSelect} value={selectedMatch ? (matchType === 'cup' ? selectedMatch.match : selectedMatch.journee) : ''}>
+                                <option value="">-- Match --</option>
+                                {currentMatches.map(match => (
+                                    <option key={matchType === 'cup' ? match.match : match.journee} value={matchType === 'cup' ? match.match : match.journee}>
+                                        {matchType === 'cup' ? `${match.match} - ${new Date(match.date + 'T12:00:00').toLocaleDateString('fr-FR')}` : `J${match.journee} - ${new Date(match.date + 'T12:00:00').toLocaleDateString('fr-FR')}`}
+                                        {match.scoreRouges !== null ? ` (${match.scoreRouges}-${match.scoreBlancs})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            {selectedMatch && (
+                                <div className="space-y-2">
+                                    <input type="date" className="w-full p-2 border rounded text-sm" value={selectedDate} onChange={handleDateChange} />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div><label className="block font-semibold text-xs mb-1 text-red-600">Rouges:</label><input type="number" min="0" className="w-full p-2 border rounded text-sm" value={scoreRouges} onChange={(e) => setScoreRouges(e.target.value)} /></div>
+                                        <div><label className="block font-semibold text-xs mb-1 text-blue-600">Blancs:</label><input type="number" min="0" className="w-full p-2 border rounded text-sm" value={scoreBlancs} onChange={(e) => setScoreBlancs(e.target.value)} /></div>
+                                    </div>
+                                    <div className="border-t pt-2"><h3 className="font-bold text-sm mb-1">Buteurs</h3><div className="grid grid-cols-2 gap-2 mb-1">
+                                        <select className="w-full p-2 border rounded text-sm" value={selectedTeam} onChange={(e) => setSelectedTeam(e.target.value)}><option value="rouges">Rouges</option><option value="blancs">Blancs</option></select>
+                                        <select className="w-full p-2 border rounded text-sm" value={selectedPlayer} onChange={(e) => setSelectedPlayer(e.target.value)}><option value="">-- Joueur --</option>{players.map(p => <option key={p} value={p}>{p}</option>)}</select>
+                                    </div><button onClick={addScorer} disabled={!selectedPlayer} className="w-full bg-blue-600 text-white py-2 rounded font-bold text-sm disabled:bg-gray-300">Ajouter buteur</button></div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="bg-red-50 p-2 rounded"><h4 className="font-bold text-red-700 text-xs mb-1">Rouges ({buteursRouges.length})</h4>{buteursRouges.map((b, i) => <div key={i} className="flex justify-between bg-white p-1 rounded mb-1 text-xs"><span>⚽ {b}</span><button onClick={() => removeScorer('rouges', i)} className="text-red-600">❌</button></div>)}</div>
+                                        <div className="bg-blue-50 p-2 rounded"><h4 className="font-bold text-blue-700 text-xs mb-1">Blancs ({buteursBlancs.length})</h4>{buteursBlancs.map((b, i) => <div key={i} className="flex justify-between bg-white p-1 rounded mb-1 text-xs"><span>⚽ {b}</span><button onClick={() => removeScorer('blancs', i)} className="text-blue-600">❌</button></div>)}</div>
+                                    </div>
+                                    <button onClick={handleSaveMatch} disabled={saving} className="w-full bg-green-600 text-white py-2 rounded font-bold text-sm">{saving ? '💾 En cours...' : '✅ Enregistrer'}</button>
+                                </div>
+                            )}
+                        </div>
+                        <div className="bg-white rounded-lg shadow-lg p-3"><h3 className="font-bold text-red-600 mb-2 text-sm">⚠️ Danger</h3><button onClick={handleResetData} className="bg-red-600 text-white px-3 py-2 rounded font-bold text-sm">🗑️ Réinitialiser</button></div>
+                    </div>
+                </div>
+            );
+        };
+        ReactDOM.render(<AdminApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
+```
+
+---
+
+## ⚽ **CODE 2 : PAGE VISITEUR (index.html)**
+
+Copiez ce code pour votre dépôt `championnat-visiteur` :
+
+**Attendez 10 secondes, je prépare le code visiteur...**
