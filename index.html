@@ -45,7 +45,7 @@
             const [goalsBlancs, setGoalsBlancs] = useState([]);
             const [saving, setSaving] = useState(false);
 
-            const championshipDates = ['2026-01-19', '2026-01-26', '2026-02-02', '2026-02-09', '2026-02-23', '2026-03-02', '2026-03-09', '2026-03-16', '2026-03-23', '2026-03-30', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11', '2026-05-18', '2026-06-01'];
+            const championshipDates = ['2026-01-19', '2026-01-26', '2026-02-02', '2026-02-09', '2026-02-23', '2026-03-02', '2026-03-09', '2026-03-16', '2026-03-23', '2026-03-30', '2026-04-13', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11', '2026-05-18', '2026-06-01'];
 
             useEffect(() => {
                 const unsubMatches = db.collection('championship').doc('matches').onSnapshot((doc) => {
@@ -176,13 +176,13 @@
                                     <option key={match.journee} value={match.journee}>
                                         J{match.journee} - {new Date(match.date + 'T12:00:00').toLocaleDateString('fr-FR')}
                                         {match.scoreRouges !== null ? ` (${match.scoreRouges}-${match.scoreBlancs})` : ''}
-                                        {match.journee === 16 ? ' 🍽️ FINALE + REPAS' : ''}
+                                        {match.journee === 17 ? ' 🍽️ FINALE + REPAS' : ''}
                                     </option>
                                 ))}
                             </select>
                             {selectedMatch && (
                                 <div className="space-y-2">
-                                    {selectedMatch.journee === 16 && (
+                                    {selectedMatch.journee === 17 && (
                                         <div className="bg-yellow-100 border-2 border-yellow-500 rounded-lg p-2 text-center">
                                             <p className="text-sm font-bold text-yellow-800">🍽️ MATCH FINAL - L'équipe perdante offre le repas !</p>
                                         </div>
@@ -252,4 +252,4 @@
         ReactDOM.render(<AdminApp />, document.getElementById('root'));
     </script>
 </body>
-    </html>
+</html>
